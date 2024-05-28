@@ -1,0 +1,22 @@
+.{
+    .name = "scry",
+    // This is a [Semantic Version](https://semver.org/).
+    // In a future version of Zig it will be used for package deduplication.
+    .version = "0.0.1",
+
+    // This field is optional.
+    // This is currently advisory only; Zig does not yet do anything
+    // with this value.
+    .minimum_zig_version = "0.12.0",
+
+    .dependencies = .{},
+
+    .paths = .{
+        ".gitignore",
+        "lib",
+        "build.zig",
+        "build.zig.zon",
+        "README.md",
+        "LICENSE",
+    },
+}
