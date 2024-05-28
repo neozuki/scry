@@ -12,11 +12,8 @@
     .dependencies = .{},
 
     .paths = .{
-        ".gitignore",
         "lib",
         "build.zig",
         "build.zig.zon",
-        "README.md",
-        "LICENSE",
     },
 }
