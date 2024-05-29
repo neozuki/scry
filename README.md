@@ -54,7 +54,7 @@ They take the form of `MyFutureType.Result.ok: []T`, `MyFutureType.Result.err: a
 var fbuf = Future(u8){};
 fbuf.start(&pool, loadFile, .{ allocator, "data/config.lua" });
 ```
-Arguments to the promise function need to be a tuple. There's no requirements on arguments; Futures just want a slice (or error) from the promise function.
+Arguments to the promise function need to be a tuple. There's no requirements for specific arguments; Futures just want a slice (or error) from the promise function.
 
 ### Writing Promises
 Promise functions are nothing special: return either a slice or an error. The type of slice they return must match the type of Future.  
