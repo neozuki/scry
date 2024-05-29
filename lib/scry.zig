@@ -2,7 +2,6 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Pool = std.Thread.Pool;
-const WaitGroup = std.Thread.WaitGroup;
 const Value = std.atomic.Value;
 
 const ResultTag = enum {
@@ -35,16 +34,14 @@ pub fn Future(comptime T: type) type {
             return self.*._started.load(.acquire);
         }
 
-        /// Use this to take ownership of the result.
-        /// Make sure to free the result with the same allocator passed in to `start`.
-        /// The future will contain a `none` result afterwards.
+        /// Use to take ownership of the result, getting a Result union.
         pub fn take(self: *Self) Result {
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
             return result;
         }
 
-        /// Destructures the Result into the `[]T`, or throws an error (if present)
+        /// Use to take ownership of the result, getting either []T or an error.
         pub fn takeUnwrapped(self: *Self) ![]T {
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
@@ -62,7 +59,7 @@ pub fn Future(comptime T: type) type {
         }
 
         /// Use this to start the future.
-        pub fn start(self: *Self, pool: *Pool, pAlloc: Allocator, comptime pFn: anytype, pArgs: anytype) void {
+        pub fn start(self: *Self, pool: *Pool, comptime pFn: anytype, pArgs: anytype) void {
             // Provide comptime clarification on `pFn` & `pArgs` expectations.
             const FnType = @TypeOf(pFn);
             const ArgsType = @TypeOf(pArgs);
@@ -78,9 +75,8 @@ pub fn Future(comptime T: type) type {
             // TODO: maybe add some assertions (if we're in certain build modes?)
 
             self.*._done.store(false, .release); // reset
-            self.*._started.store(false, .release); // reset
 
-            const run_args = .{ self, pFn, .{pAlloc} ++ pArgs };
+            const run_args = .{ self, pFn, pArgs };
             pool.spawn(run, run_args) catch |err| {
                 self.*._result = Result{ .err = err };
                 self.*._done.store(true, .release);
@@ -112,9 +108,7 @@ test "basic" {
         }
     };
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{
-        .thread_safe = true,
-    }){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     var pool: Pool = undefined;
@@ -123,14 +117,14 @@ test "basic" {
 
     var fi32 = Future(i32){};
 
-    fi32.start(&pool, allocator, Helper.add_i32, .{ 2, 40 });
+    fi32.start(&pool, Helper.add_i32, .{ allocator, 2, 40 });
     while (!fi32.done()) {}
     const value = try fi32.takeUnwrapped();
     try testing.expect(1 == value.len);
     try testing.expect(42 == value[0]);
     allocator.free(value);
 
-    fi32.start(&pool, allocator, Helper.add_i32, .{ 5, 10 });
+    fi32.start(&pool, Helper.add_i32, .{ allocator, 5, 10 });
     while (!fi32.done()) {}
     const result = fi32.take();
     try testing.expect(.ok == result);
