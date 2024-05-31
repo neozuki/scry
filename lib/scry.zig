@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Pool = std.Thread.Pool;
@@ -36,6 +37,10 @@ pub fn Future(comptime T: type) type {
 
         /// Use to take ownership of the result, getting a Result union.
         pub fn take(self: *Self) Result {
+            if (.Debug == builtin.mode) {
+                assert(self.done());
+            }
+
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
             return result;
@@ -43,6 +48,10 @@ pub fn Future(comptime T: type) type {
 
         /// Use to take ownership of the result, getting either []T or an error.
         pub fn takeUnwrapped(self: *Self) ![]T {
+            if (.Debug == builtin.mode) {
+                assert(self.done());
+            }
+
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
             switch (result) {
@@ -71,8 +80,6 @@ pub fn Future(comptime T: type) type {
             if (.Struct != argstype_info or !argstype_info.Struct.is_tuple) {
                 @compileError("`pArgs` must be tuple, found " ++ @typeName(ArgsType));
             }
-
-            // TODO: maybe add some assertions (if we're in certain build modes?)
 
             self.*._done.store(false, .release); // reset
 
@@ -132,3 +139,24 @@ test "basic" {
     try testing.expect(15 == result.ok[0]);
     allocator.free(result.ok);
 }
+
+//test "logic error" {
+//    const Helper = struct {
+//        pub fn wait(milliseconds: u64) !void {
+//            std.time.sleep(milliseconds * 1_000_000);
+//        }
+//    };
+//
+//    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
+//    defer _ = gpa.deinit();
+//    const allocator = gpa.allocator();
+//    var pool: Pool = undefined;
+//    try pool.init(.{ .allocator = allocator });
+//    defer pool.deinit();
+//
+//    var fvoid = Future(void){};
+//    fvoid.start(&pool, Helper.wait, .{5000});
+//    while (!fvoid.done()) {}
+//    const result = fvoid.take();
+//    try testing.expect(.ok == result);
+//}
