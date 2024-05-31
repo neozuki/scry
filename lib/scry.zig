@@ -130,23 +130,28 @@ test "basic" {
     try testing.expect(15 == result.ok);
 }
 
-//test "logic error" {
-//    const Helper = struct {
-//        pub fn wait(milliseconds: u64) !void {
-//            std.time.sleep(milliseconds * 1_000_000);
-//        }
-//    };
-//
-//    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
-//    defer _ = gpa.deinit();
-//    const allocator = gpa.allocator();
-//    var pool: Pool = undefined;
-//    try pool.init(.{ .allocator = allocator });
-//    defer pool.deinit();
-//
-//    var fvoid = Future(void){};
-//    fvoid.start(&pool, Helper.wait, .{5000});
-//    while (!fvoid.done()) {}
-//    const result = fvoid.take();
-//    try testing.expect(.ok == result);
-//}
+// TODO: See if this is worth it:
+// During a normal test (zig build test) skip tests like the one below.
+// Then run (manually? automatable?) specific tests that *should* fail / panic.
+// Basically, something like: https://github.com/ziglang/zig/issues/1356
+test "logic error" {
+    return error.SkipZigTest;
+
+    //const Helper = struct {
+    //    pub fn wait(milliseconds: u64) !void {
+    //        std.time.sleep(milliseconds * 1_000_000);
+    //    }
+    //};
+
+    //var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
+    //defer _ = gpa.deinit();
+    //const allocator = gpa.allocator();
+    //var pool: Pool = undefined;
+    //try pool.init(.{ .allocator = allocator });
+    //defer pool.deinit();
+
+    //var fvoid = Future(void){};
+    //fvoid.start(&pool, Helper.wait, .{5000});
+    //const result = fvoid.take(); // trigger a panic
+    //_ = result;
+}
