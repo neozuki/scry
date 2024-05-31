@@ -16,7 +16,7 @@ pub fn Future(comptime T: type) type {
         const Self = @This();
 
         const Result = union(ResultTag) {
-            ok: []T,
+            ok: T,
             err: anyerror, // TODO: Investigate a way to have specific errors
             none: i32,
         };
@@ -37,9 +37,7 @@ pub fn Future(comptime T: type) type {
 
         /// Use to take ownership of the result, getting a Result union.
         pub fn take(self: *Self) Result {
-            if (.Debug == builtin.mode) {
-                assert(self.done());
-            }
+            assert(self.done());
 
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
@@ -48,9 +46,7 @@ pub fn Future(comptime T: type) type {
 
         /// Use to take ownership of the result, getting either []T or an error.
         pub fn takeUnwrapped(self: *Self) ![]T {
-            if (.Debug == builtin.mode) {
-                assert(self.done());
-            }
+            assert(self.done());
 
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
