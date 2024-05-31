@@ -45,7 +45,7 @@ pub fn Future(comptime T: type) type {
         }
 
         /// Use to take ownership of the result, getting either []T or an error.
-        pub fn takeUnwrapped(self: *Self) ![]T {
+        pub fn takeUnwrapped(self: *Self) !T {
             assert(self.done());
 
             const result = self.*._result;
@@ -104,10 +104,8 @@ const testing = std.testing;
 
 test "basic" {
     const Helper = struct {
-        pub fn add_i32(allocator: Allocator, a: i32, b: i32) ![]i32 {
-            var result = try allocator.alloc(i32, 1);
-            result[0] = a + b;
-            return result;
+        pub fn add_i32(a: i32, b: i32) !i32 {
+            return a + b;
         }
     };
 
@@ -120,20 +118,16 @@ test "basic" {
 
     var fi32 = Future(i32){};
 
-    fi32.start(&pool, Helper.add_i32, .{ allocator, 2, 40 });
+    fi32.start(&pool, Helper.add_i32, .{ 2, 40 });
     while (!fi32.done()) {}
     const value = try fi32.takeUnwrapped();
-    try testing.expect(1 == value.len);
-    try testing.expect(42 == value[0]);
-    allocator.free(value);
+    try testing.expect(42 == value);
 
-    fi32.start(&pool, Helper.add_i32, .{ allocator, 5, 10 });
+    fi32.start(&pool, Helper.add_i32, .{ 5, 10 });
     while (!fi32.done()) {}
     const result = fi32.take();
     try testing.expect(.ok == result);
-    try testing.expect(1 == result.ok.len);
-    try testing.expect(15 == result.ok[0]);
-    allocator.free(result.ok);
+    try testing.expect(15 == result.ok);
 }
 
 //test "logic error" {
