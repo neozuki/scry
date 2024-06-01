@@ -18,7 +18,7 @@ pub fn Future(comptime T: type) type {
         const Result = union(ResultTag) {
             ok: T,
             err: anyerror, // TODO: Investigate a way to have specific errors
-            none: i32,
+            none: i32, // TODO: remove 'none' stuff
         };
 
         _result: Result = @unionInit(Result, "none", 0),
@@ -26,25 +26,25 @@ pub fn Future(comptime T: type) type {
         _started: Value(bool) = Value(bool).init(false),
 
         /// Check if future is finished.
-        pub fn done(self: *Self) bool {
+        pub fn done(self: *const Self) bool {
             return self.*._done.load(.acquire);
         }
 
         /// Check if future has been started.
-        pub fn started(self: *Self) bool {
+        pub fn started(self: *const Self) bool {
             return self.*._started.load(.acquire);
         }
 
         /// Gets the Future.Result -- blocks if result is forthcoming.
         /// To avoid blocking do `if (fut.done()) { //use result }`
-        pub fn get(self: *Self) Result {
+        pub fn get(self: *const Self) Result {
             while (!self.done()) {}
             return self.*._result;
         }
 
         /// Gets unwrapped result T or error -- blocks if result is forthcoming.
         /// To avoid blocking do `if (fut.done()) { //use result }`
-        pub fn unwrap(self: *Self) !T {
+        pub fn unwrap(self: *const Self) !T {
             while (!self.done()) {}
             switch (self._result) {
                 .ok => |ok| {
@@ -55,7 +55,7 @@ pub fn Future(comptime T: type) type {
                 },
                 .none => |_| {
                     return error.NoneValue;
-                }, // TODO remove 'none' stuff
+                }, // TODO: remove 'none' stuff
             }
         }
 
@@ -121,8 +121,14 @@ test "basic" {
     fut_i32.init(&pool, Helper.add_i32, .{ 2, 40 });
     while (!fut_i32.done()) {}
     const result = fut_i32.get();
-    try testing.expect(.ok == result);
-    try testing.expect(42 == result.ok);
+    switch (result) {
+        .ok => |ok| {
+            try testing.expect(42 == ok);
+        },
+        else => {
+            unreachable;
+        },
+    }
 }
 
 test "blocking get" {
@@ -142,6 +148,6 @@ test "blocking get" {
 
     var fut_bool = Future(bool){};
     fut_bool.init(&pool, Helper.wait, .{1000});
-    const value = try fut_bool.unwrap();
+    const value = fut_bool.unwrap() catch unreachable;
     try testing.expect(true == value);
 }
