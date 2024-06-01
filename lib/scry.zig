@@ -37,16 +37,24 @@ pub fn Future(comptime T: type) type {
 
         /// Use to take ownership of the result, getting a Result union.
         pub fn take(self: *Self) Result {
-            assert(self.done());
-
-            const result = self.*._result;
-            self.*._result = Result{ .none = 0 };
-            return result;
+            while (!self.done()) {}
+            return self.*._result;
         }
 
         /// Use to take ownership of the result, getting either []T or an error.
         pub fn takeUnwrapped(self: *Self) !T {
-            assert(self.done());
+            while (!self.done()) {}
+            switch (self.*._result) {
+                .ok => |ok| {
+                    return ok;
+                },
+                .err => |err| {
+                    return err;
+                },
+                .none => |_| {
+                    return error.NoneValue;
+                },
+            }
 
             const result = self.*._result;
             self.*._result = Result{ .none = 0 };
@@ -76,7 +84,7 @@ pub fn Future(comptime T: type) type {
                 @compileError("`pArgs` must be tuple, found " ++ @typeName(ArgsType));
             }
 
-            // could spawn on heap and allow `var fut = Future(T).init(..);`?
+            // maybe: spawn on heap and allow `var fut = Future(T).init(..);`?
             const run_args = .{ self, pFn, pArgs };
             pool.spawn(run, run_args) catch |err| {
                 self._result = Result{ .err = err };
@@ -128,28 +136,23 @@ test "basic" {
     try testing.expect(42 == value);
 }
 
-// TODO: See if this is worth it:
-// During a normal test (zig build test) skip tests like the one below.
-// Then run (manually? automatable?) specific tests that *should* fail / panic.
-// Basically, something like: https://github.com/ziglang/zig/issues/1356
-test "logic error" {
-    return error.SkipZigTest;
+test "blocking get" {
+    const Helper = struct {
+        pub fn wait(milliseconds: u64) !bool {
+            std.time.sleep(milliseconds * 1_000_000);
+            return true;
+        }
+    };
 
-    //const Helper = struct {
-    //    pub fn wait(milliseconds: u64) !void {
-    //        std.time.sleep(milliseconds * 1_000_000);
-    //    }
-    //};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    var pool: Pool = undefined;
+    try pool.init(.{ .allocator = allocator });
+    defer pool.deinit();
 
-    //var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
-    //defer _ = gpa.deinit();
-    //const allocator = gpa.allocator();
-    //var pool: Pool = undefined;
-    //try pool.init(.{ .allocator = allocator });
-    //defer pool.deinit();
-
-    //var fvoid = Future(void){};
-    //fvoid.start(&pool, Helper.wait, .{5000});
-    //const result = fvoid.take(); // trigger a panic
-    //_ = result;
+    var fut_bool = Future(bool){};
+    fut_bool.init(&pool, Helper.wait, .{1000});
+    const result = try fut_bool.takeUnwrapped();
+    try testing.expect(true == result);
 }
