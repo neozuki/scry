@@ -1,7 +1,8 @@
 # Scry
 A simple implementation of futures in Zig.  
 
-Comments, suggestions, corrections, etc. are welcome.
+Comments, suggestions, corrections, etc. are welcome.  
+(Note: The library is early in development and the design isn't finalized. You can always check tests to see usage and expectations.)
 
 ### Creating Futures
 Futures are created by passing in a type.
@@ -13,7 +14,7 @@ var buffer_fut = scry.Future([]u8){}; // we don't need to create the type before
 ### Checking Futures
 Futures have two flags protected by atomics. However, there is no lock mechanism. Futures work under the assumption of a single producer, single consumer model.
 ```zig
-my_fut.start(..); // 'start' explained below
+my_fut.init(..); // '.init()' explained below
 assert(true == my_fut.started());
 while (!my_fut.done()) {} // waiting (probably not doing this in a real setting)
 // now our result is ready
@@ -31,7 +32,7 @@ try testing.expect(15 == result.ok);
 const value = try fi32.takeUnwrapped();
 try testing.expect(42 == value);
 ```
-Both methods leave the Future with a dummy 'none' result. The future can then be reused with another call to `.start()`.
+Both methods leave the Future with a dummy 'none' result.  
 Taking ownership means that if a producer / promise function allocates memory (by passing in an allocator) then the consumer should free the result.
 
 ### Result Union
@@ -41,12 +42,12 @@ They take the form of `MyFutureType.Result.ok: T`, `MyFutureType.Result.err: any
 (Note: `.ok` & `.err` are the interesting union tags, while `.none` is due to my scuffed implementation.)
 
 ### Starting Futures
-`.start()` needs a pointer to a thread pool, the function to call, and some arguments.
+`.init()` needs a pointer to a thread pool, the function to call, and some arguments.
 ```zig
 var futcheck = Future(bool){};
-fbuf.start(&pool, doCheck, .{ "GL_ARB_tessellation_shader"});
+fbuf.init(&pool, doCheck, .{ "GL_ARB_tessellation_shader"});
 ```
-The arguments must be a tuple. The function should return the result or some error.
+The arguments must be a tuple. The function should return the result or some error.  
 
 ### Writing Promises
 Promise functions are nothing special: return the expected type or an error. A promise for a `Future([]u8)` might look like `loadFile(allocator: Allocator, path: []const u8) ![]u8`.  

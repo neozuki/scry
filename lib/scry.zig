@@ -63,8 +63,7 @@ pub fn Future(comptime T: type) type {
             }
         }
 
-        /// Use this to start the future.
-        pub fn start(self: *Self, pool: *Pool, comptime pFn: anytype, pArgs: anytype) void {
+        pub fn init(self: *Self, pool: *Pool, comptime pFn: anytype, pArgs: anytype) void {
             // Provide comptime clarification on `pFn` & `pArgs` expectations.
             const FnType = @TypeOf(pFn);
             const ArgsType = @TypeOf(pArgs);
@@ -77,14 +76,19 @@ pub fn Future(comptime T: type) type {
                 @compileError("`pArgs` must be tuple, found " ++ @typeName(ArgsType));
             }
 
-            self.*._done.store(false, .release); // reset
-
+            // could spawn on heap and allow `var fut = Future(T).init(..);`?
             const run_args = .{ self, pFn, pArgs };
             pool.spawn(run, run_args) catch |err| {
-                self.*._result = Result{ .err = err };
-                self.*._done.store(true, .release);
+                self._result = Result{ .err = err };
+                self._done.store(true, .release);
             };
-            self.*._started.store(true, .release);
+            self._started.store(true, .release);
+            return;
+        }
+
+        pub fn deinit(self: *Self) void {
+            // TODO
+            _ = self;
             return;
         }
 
@@ -116,18 +120,12 @@ test "basic" {
     try pool.init(.{ .allocator = allocator });
     defer pool.deinit();
 
-    var fi32 = Future(i32){};
-
-    fi32.start(&pool, Helper.add_i32, .{ 2, 40 });
-    while (!fi32.done()) {}
-    const value = try fi32.takeUnwrapped();
+    var fut_i32 = Future(i32){};
+    defer fut_i32.deinit();
+    fut_i32.init(&pool, Helper.add_i32, .{ 2, 40 });
+    while (!fut_i32.done()) {}
+    const value = try fut_i32.takeUnwrapped();
     try testing.expect(42 == value);
-
-    fi32.start(&pool, Helper.add_i32, .{ 5, 10 });
-    while (!fi32.done()) {}
-    const result = fi32.take();
-    try testing.expect(.ok == result);
-    try testing.expect(15 == result.ok);
 }
 
 // TODO: See if this is worth it:
