@@ -35,16 +35,18 @@ pub fn Future(comptime T: type) type {
             return self.*._started.load(.acquire);
         }
 
-        /// Use to take ownership of the result, getting a Result union.
-        pub fn take(self: *Self) Result {
+        /// Gets the Future.Result -- blocks if result is forthcoming.
+        /// To avoid blocking do `if (fut.done()) { //use result }`
+        pub fn get(self: *Self) Result {
             while (!self.done()) {}
             return self.*._result;
         }
 
-        /// Use to take ownership of the result, getting either []T or an error.
-        pub fn takeUnwrapped(self: *Self) !T {
+        /// Gets unwrapped result T or error -- blocks if result is forthcoming.
+        /// To avoid blocking do `if (fut.done()) { //use result }`
+        pub fn unwrap(self: *Self) !T {
             while (!self.done()) {}
-            switch (self.*._result) {
+            switch (self._result) {
                 .ok => |ok| {
                     return ok;
                 },
@@ -53,21 +55,7 @@ pub fn Future(comptime T: type) type {
                 },
                 .none => |_| {
                     return error.NoneValue;
-                },
-            }
-
-            const result = self.*._result;
-            self.*._result = Result{ .none = 0 };
-            switch (result) {
-                Result.ok => |ok| {
-                    return ok;
-                },
-                Result.err => |err| {
-                    return err;
-                },
-                Result.none => {
-                    return error.NoneValue;
-                },
+                }, // TODO remove 'none' stuff
             }
         }
 
@@ -132,8 +120,9 @@ test "basic" {
     defer fut_i32.deinit();
     fut_i32.init(&pool, Helper.add_i32, .{ 2, 40 });
     while (!fut_i32.done()) {}
-    const value = try fut_i32.takeUnwrapped();
-    try testing.expect(42 == value);
+    const result = fut_i32.get();
+    try testing.expect(.ok == result);
+    try testing.expect(42 == result.ok);
 }
 
 test "blocking get" {
@@ -153,6 +142,6 @@ test "blocking get" {
 
     var fut_bool = Future(bool){};
     fut_bool.init(&pool, Helper.wait, .{1000});
-    const result = try fut_bool.takeUnwrapped();
-    try testing.expect(true == result);
+    const value = try fut_bool.unwrap();
+    try testing.expect(true == value);
 }
