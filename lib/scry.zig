@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Pool = std.Thread.Pool;
@@ -82,9 +81,12 @@ pub fn Future(comptime T: type) type {
             return;
         }
 
-        pub fn deinit(self: *Self) void {
-            // TODO
-            _ = self;
+        pub fn deinit(self: *Self, allocator: Allocator) void {
+            // TODO: let tasks be cancelable and let Future deinit whenever
+            assert(true == self.done());
+            if (.ok == self._result) {
+                allocator.free(self.*._result.ok);
+            }
             return;
         }
 
@@ -117,7 +119,6 @@ test "basic" {
     defer pool.deinit();
 
     var fut_i32 = Future(i32){};
-    defer fut_i32.deinit();
     fut_i32.init(&pool, Helper.add_i32, .{ 2, 40 });
     while (!fut_i32.done()) {}
     const result = fut_i32.get();
@@ -150,4 +151,26 @@ test "blocking get" {
     fut_bool.init(&pool, Helper.wait, .{1000});
     const value = fut_bool.unwrap() catch unreachable;
     try testing.expect(true == value);
+}
+
+test "deinit" {
+    const Helper = struct {
+        pub fn alloc(allocator: Allocator, comptime T: type, n: usize) ![]T {
+            return try allocator.alloc(T, n);
+        }
+    };
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    var pool: Pool = undefined;
+    try pool.init(.{ .allocator = allocator });
+    defer pool.deinit();
+
+    var fut_buf = Future([]u8){};
+    fut_buf.init(&pool, Helper.alloc, .{ allocator, u8, @sizeOf(usize) * 64 });
+    defer fut_buf.deinit(allocator);
+
+    const result = fut_buf.get();
+    try testing.expect(.ok == result);
 }
